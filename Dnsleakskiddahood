@@ -1,0 +1,248 @@
+local NotificationHolder = loadstring(game:HttpGet("https://raw.githubusercontent.com/BocusLuke/UI/main/STX/Module.Lua"))()
+local Notification = loadstring(game:HttpGet("https://raw.githubusercontent.com/BocusLuke/UI/main/STX/Client.Lua"))()
+
+Notification:Notify(
+    {Title = "Sylex Hub beta: bu Ascend", Description = "Thanks for using my hub!"},
+    {OutlineColor = Color3.fromRGB(80, 80, 80),Time = 5, Type = "option"},
+    {Image = "http://www.roblox.com/asset/?id=6023426923", ImageColor = Color3.fromRGB(255, 84, 84), Callback = function(State) print(tostring(State)) end}
+)
+
+
+local OrionLib = loadstring(game:HttpGet(('https://raw.githubusercontent.com/shlexware/Orion/main/source')))()
+
+
+
+
+local Window = OrionLib:MakeWindow({Name = "Sylex Hub", HidePremium = false, SaveConfig = true, ConfigFolder = "OrionTest"})
+
+
+
+
+local Tab = Window:MakeTab({
+	Name = "Combat",
+	Icon = "rbxassetid://4483345998",
+	PremiumOnly = false
+})
+
+
+
+Tab:AddButton({
+	Name = "Autoparry V2",
+	Callback = function()
+      		
+if getgenv().executed then return end local UserInputService = game:GetService("UserInputService") local ReplicatedStorage = game:GetService("ReplicatedStorage") local LocalPlayer = game:GetService("Players").LocalPlayer local Balls = game:GetService("Workspace").Balls local IsTargeted = false local CanHit = false function FindBall() local RealBall for i, v in pairs(Balls:GetChildren()) do if v:GetAttribute("realBall") == true then RealBall = v end end return RealBall end function IsTarget() local Ball = FindBall() 	 if Ball and Ball:GetAttribute("target") == LocalPlayer.Name then return true end return false end function DetectBall() local Ball = FindBall() 	if Ball then local BallVelocity = Ball.Velocity.Magnitude local BallPosition = Ball.Position local PlayerPosition = LocalPlayer.Character.HumanoidRootPart.Position local Distance = (BallPosition - PlayerPosition).Magnitude local PingAccountability = BallVelocity * (game.Stats.Network.ServerStatsItem["Data Ping"]:GetValue() / 1000) Distance -= PingAccountability Distance -= shared.config.adjustment local Hit = Distance / BallVelocity if Hit <= shared.config.hit_range then return true end end return false end function DeflectBall() if IsTargeted and DetectBall() then if shared.config.deflect_type == 'Key Press' then keypress(0x46) else ReplicatedStorage.Remotes.ParryButtonPress:Fire() end end end UserInputService.InputBegan:Connect(function(Input, IsTyping) if IsTyping then return end if shared.config.mode == 'Toggle' and Input.KeyCode == shared.config.keybind then CanHit = not CanHit if shared.config.notifications then game:GetService("StarterGui"):SetCore("SendNotification",{ Title = "Blade Ball", Text = CanHit and 'Enabled!' or 'Disabled!', }) end elseif shared.config.mode == 'Hold' and Input.KeyCode == shared.config.keybind and shared.config.notifications then game:GetService("StarterGui"):SetCore("SendNotification",{ Title = "Blade Ball", Text = 'Holding keybind!', }) end end) UserInputService.InputEnded:Connect(function(Input, IsTyping) if IsTyping then return end if shared.config.mode == 'Hold' and Input.KeyCode == shared.config.keybind and shared.config.notifications then game:GetService("StarterGui"):SetCore("SendNotification",{ Title = "Sylex", Text = 'Go get them my boy!', }) end end) game:GetService('RunService').Heartbeat:Connect(function() IsTargeted = IsTarget() if shared.config.mode == 'Hold' and UserInputService:IsKeyDown(shared.config.keybind) then DeflectBall() elseif shared.config.mode == 'Toggle' and CanHit then DeflectBall() elseif shared.config.mode == 'Always' then DeflectBall() end end) getgenv().executed = trueshared.config = {
+   adjustment = 3.6, -- // Keep this between 3 to 4 \\ --
+   hit_range = 0.3, -- // You can mess around with this \\ --
+
+   mode = 'Always', -- // Hold , Toggle , Always \\ --
+   deflect_type = 'Remote', -- // Key Press , Remote \\ --
+   notifications = true,
+   keybind = Enum.KeyCode.E
+}
+
+  	end    
+})
+
+
+Tab:AddButton({
+	Name = "Autoparry",
+	Callback = function()
+      		
+local Debug = false -- Set this to true if you want my debug output.
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
+
+local Player = Players.LocalPlayer or Players.PlayerAdded:Wait()
+local Remotes = ReplicatedStorage:WaitForChild("Remotes", 9e9) -- A second argument in waitforchild what could it mean?
+local Balls = workspace:WaitForChild("Balls", 9e9)
+
+-- Functions
+
+local function print(...) -- Debug print.
+    if Debug then
+        warn(...)
+    end
+end
+
+local function VerifyBall(Ball) -- Returns nil if the ball isn't a valid projectile; true if it's the right ball.
+    if typeof(Ball) == "Instance" and Ball:IsA("BasePart") and Ball:IsDescendantOf(Balls) and Ball:GetAttribute("realBall") == true then
+        return true
+    end
+end
+
+local function IsTarget() -- Returns true if we are the current target.
+    return (Player.Character and Player.Character:FindFirstChild("Highlight"))
+end
+
+local function Parry() -- Parries.
+    Remotes:WaitForChild("ParryButtonPress"):Fire()
+end
+
+-- The actual code
+
+Balls.ChildAdded:Connect(function(Ball)
+    if not VerifyBall(Ball) then
+        return
+    end
+    
+    print(`Ball Spawned: {Ball}`)
+    
+    local OldPosition = Ball.Position
+    local OldTick = tick()
+    
+    Ball:GetPropertyChangedSignal("Position"):Connect(function()
+        if IsTarget() then -- No need to do the math if we're not being attacked.
+            local Distance = (Ball.Position - workspace.CurrentCamera.Focus.Position).Magnitude
+            local Velocity = (OldPosition - Ball.Position).Magnitude -- Fix for .Velocity not working. Yes I got the lowest possible grade in accuplacer math.
+            
+            print(`Distance: {Distance}\nVelocity: {Velocity}\nTime: {Distance / Velocity}`)
+        
+            if (Distance / Velocity) <= 10 then -- Sorry for the magic number. This just works. No, you don't get a slider for this because it's 2am.
+                Parry()
+            end
+        end
+        
+        if (tick() - OldTick >= 1/60) then -- Don't want it to update too quickly because my velocity implementation is aids. Yes, I tried Ball.Velocity. No, it didn't work.
+            OldTick = tick()
+            OldPosition = Ball.Position
+        end
+    end)
+end)
+  	end    
+})
+
+
+
+
+Tab:AddButton({
+	Name = "Autospam ",
+	Callback = function()
+      		loadstring(game:HttpGet("https://pastebin.com/raw/t2391h1A"))()
+
+
+  	end    
+})
+
+Tab:AddButton({
+	Name = "Auto Detect Spam",
+	Callback = function()
+      		
+  loadstring(game:HttpGet("https://pastebin.com/raw/BiR2uMXt"))()
+ 
+
+	end    
+})
+
+
+
+ 
+
+local Tab = Window:MakeTab({
+	Name = "Legit",
+	Icon = "rbxassetid://4483345998",
+	PremiumOnly = false
+})
+
+
+Tab:AddButton({
+	Name = "Aiming mechanism",
+	Callback = function()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/Hosvile/Refinement/main/M%3ABlade%20Ball%20Mechanism",true))()
+
+Tab:AddButton({
+	Name = "FPS Boost",
+	Callback = function()
+      		
+
+_G.Settings = {
+    Players = {
+        ["Ignore Me"] = true, -- Ignore your Character
+        ["Ignore Others"] = true -- Ignore other Characters
+    },
+    Meshes = {
+        Destroy = false, -- Destroy Meshes
+        LowDetail = true -- Low detail meshes (NOT SURE IT DOES ANYTHING)
+    },
+    Images = {
+        Invisible = true, -- Invisible Images
+        LowDetail = false, -- Low detail images (NOT SURE IT DOES ANYTHING)
+        Destroy = false, -- Destroy Images
+    },
+    Other = {
+        ["No Particles"] = true, -- Disables all ParticleEmitter, Trail, Smoke, Fire and Sparkles
+        ["No Camera Effects"] = true, -- Disables all PostEffect's (Camera/Lighting Effects)
+        ["No Explosions"] = true, -- Makes Explosion's invisible
+        ["No Clothes"] = true, -- Removes Clothing from the game
+        ["Low Water Graphics"] = true, -- Removes Water Quality
+        ["No Shadows"] = true, -- Remove Shadows
+        ["Low Rendering"] = true, -- Lower Rendering
+        ["Low Quality Parts"] = true -- Lower quality parts
+    }
+}
+loadstring(game:HttpGet("https://raw.githubusercontent.com/CasperFlyModz/discord.gg-rips/main/FPSBooster.lua"))()
+
+  	end    
+})
+
+
+end
+})
+
+
+
+local Tab = Window:MakeTab({
+	Name = "Buys",
+	Icon = "rbxassetid://4483345998",
+	PremiumOnly = false
+})
+
+Tab:AddButton({
+	Name = "Explosion",
+	Callback = function()
+      		local args = {
+    [1] = "PromptPurchaseCrate",
+    [2] = workspace.Spawn.Crates.NormalExplosionCrate
+}
+
+game:GetService("ReplicatedStorage").Remote.RemoteFunction:InvokeServer(unpack(args))
+
+
+
+local args = {
+    [1] = "OpeningCase",
+    [2] = true
+}
+
+game:GetService("ReplicatedStorage").Remote.RemoteEvent:FireServer(unpack(args))
+
+
+
+  	end    
+})
+
+
+
+Tab:AddButton({
+	Name = "Sword Crate",
+	Callback = function()
+      		
+local args = {
+    [1] = "PromptPurchaseCrate",
+    [2] = workspace.Spawn.Crates.Model.NormalSwordCrate
+}
+
+game:GetService("ReplicatedStorage").Remote.RemoteFunction:InvokeServer(unpack(args))
+
+
+
+local args = {
+    [1] = "OpeningCase",
+    [2] = true
+}
+
+game:GetService("ReplicatedStorage").Remote.RemoteEvent:FireServer(unpack(args))
+
+
+  	end    
+})
+
